@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Maze Game - Version 6.1</title>
+    <title>3D Maze Game - Version 6</title>
     <style>
         body {
             margin: 0;
@@ -12,6 +12,7 @@
             background-color: #0a0a1a;
             color: #ffffff;
         }
+
         #gameContainer {
             position: relative;
             width: 100vw;
@@ -21,6 +22,7 @@
             align-items: center;
             perspective: 1200px;
         }
+
         #maze {
             position: relative;
             background-color: #16213e;
@@ -30,6 +32,7 @@
             transform-style: preserve-3d;
             transition: transform 0.5s ease;
         }
+
         .wall {
             position: absolute;
             background-color: #e94560;
@@ -37,12 +40,14 @@
             transform-style: preserve-3d;
             transition: all 0.3s ease;
         }
+
         .floor {
             position: absolute;
             background-color: #0f3460;
             border: 1px solid #16213e;
             transition: all 0.3s ease;
         }
+
         #player {
             position: absolute;
             width: 20px;
@@ -53,6 +58,7 @@
             z-index: 10;
             box-shadow: 0 0 15px #ffd700;
         }
+
         #goal {
             position: absolute;
             width: 30px;
@@ -63,11 +69,21 @@
             box-shadow: 0 0 20px #4ecdc4;
             animation: pulse 2s infinite;
         }
+
         @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+
+            100% {
+                transform: scale(1);
+            }
         }
+
         #hud {
             position: absolute;
             top: 20px;
@@ -79,6 +95,7 @@
             border-radius: 10px;
             z-index: 100;
         }
+
         #controls {
             position: absolute;
             bottom: 20px;
@@ -90,6 +107,7 @@
             border-radius: 5px;
             z-index: 100;
         }
+
         #levelIndicator {
             position: absolute;
             top: 20px;
@@ -101,6 +119,7 @@
             border-radius: 5px;
             z-index: 100;
         }
+
         #minimap {
             position: absolute;
             bottom: 20px;
@@ -109,6 +128,7 @@
             border: 2px solid #fff;
             z-index: 100;
         }
+
         .collectible {
             position: absolute;
             width: 15px;
@@ -119,11 +139,21 @@
             box-shadow: 0 0 10px #ff9f1c;
             animation: float 3s infinite ease-in-out;
         }
+
         @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
+            0% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+
+            100% {
+                transform: translateY(0px);
+            }
         }
+
         #staminaBar {
             position: absolute;
             bottom: 10px;
@@ -135,12 +165,14 @@
             border-radius: 5px;
             overflow: hidden;
         }
+
         #staminaFill {
             width: 100%;
             height: 100%;
             background-color: #4caf50;
             transition: width 0.3s ease;
         }
+
         #inventory {
             position: absolute;
             top: 60px;
@@ -152,6 +184,7 @@
             border-radius: 5px;
             z-index: 100;
         }
+
         #powerUpIndicator {
             position: absolute;
             top: 100px;
@@ -163,6 +196,7 @@
             border-radius: 5px;
             z-index: 100;
         }
+
         .powerUp {
             position: absolute;
             width: 20px;
@@ -173,12 +207,63 @@
             box-shadow: 0 0 15px #ff00ff;
             animation: rotate 3s infinite linear;
         }
+
         @keyframes rotate {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #startScreen h1 {
+            font-size: 48px;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+
+        #startButton {
+            font-size: 24px;
+            padding: 10px 20px;
+            background-color: #4ecdc4;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #startButton:hover {
+            background-color: #45b7ae;
+        }
+
+        .particle {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background-color: #fff;
+            border-radius: 50%;
+            pointer-events: none;
         }
     </style>
 </head>
+
 <body>
     <div id="gameContainer">
         <div id="maze"></div>
@@ -204,6 +289,10 @@
         <div id="inventory">Inventory: []</div>
         <div id="powerUpIndicator">Power-up: None</div>
     </div>
+    <div id="startScreen">
+        <h1>3D Maze Adventure</h1>
+        <button id="startButton">Start Game</button>
+    </div>
     <script>
         const maze = document.getElementById('maze');
         const playerEl = document.getElementById('player');
@@ -217,6 +306,8 @@
         const staminaFill = document.getElementById('staminaFill');
         const inventoryDisplay = document.getElementById('inventory');
         const powerUpIndicator = document.getElementById('powerUpIndicator');
+        const startScreen = document.getElementById('startScreen');
+        const startButton = document.getElementById('startButton');
 
         const mazeSize = 15;
         const cellSize = 40;
@@ -244,7 +335,8 @@
             isSprinting: false,
             keys: {},
             lastTime: 0,
-            deltaTime: 0
+            deltaTime: 0,
+            isStarted: false
         };
 
         const levels = [
@@ -265,7 +357,6 @@
                 [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
                 [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
             ],
-            // Add more levels here
         ];
 
         function createMaze() {
@@ -357,16 +448,16 @@
             playerEl.style.top = player.y * cellSize + 10 + 'px';
             updateMinimap();
         }
-function movePlayer(deltaTime) {
+
+        function movePlayer(deltaTime) {
             const currentSpeed = game.isSprinting ? player.sprintSpeed : player.speed;
-            const movement = {x: 0, y: 0};
+            const movement = { x: 0, y: 0 };
 
             if (game.keys['ArrowUp'] || game.keys['w']) movement.y -= 1;
             if (game.keys['ArrowDown'] || game.keys['s']) movement.y += 1;
             if (game.keys['ArrowLeft'] || game.keys['a']) movement.x -= 1;
             if (game.keys['ArrowRight'] || game.keys['d']) movement.x += 1;
 
-            // Normalize diagonal movement
             if (movement.x !== 0 && movement.y !== 0) {
                 movement.x *= Math.SQRT1_2;
                 movement.y *= Math.SQRT1_2;
@@ -386,9 +477,9 @@ function movePlayer(deltaTime) {
                 checkCollectibles();
                 checkPowerUps();
                 checkWin();
+                createParticles();
             }
 
-            // Update stamina
             if (game.isSprinting && (movement.x !== 0 || movement.y !== 0)) {
                 player.stamina = Math.max(0, player.stamina - 30 * deltaTime);
             } else {
@@ -402,7 +493,6 @@ function movePlayer(deltaTime) {
             const cellX = Math.floor(x);
             const cellY = Math.floor(y);
 
-            // Check if the new position is within the maze bounds and not a wall
             return cellX >= 0 && cellX < mazeSize && cellY >= 0 && cellY < mazeSize && maze[cellY][cellX] === 0;
         }
 
@@ -544,7 +634,39 @@ function movePlayer(deltaTime) {
             staminaFill.style.backgroundColor = staminaPercentage > 30 ? '#4caf50' : '#f44336';
         }
 
+        function createParticles() {
+            const particle = document.createElement('div');
+            particle.className = 'particle';
+            particle.style.left = player.x * cellSize + 20 + 'px';
+            particle.style.top = player.y * cellSize + 20 + 'px';
+            maze.appendChild(particle);
+
+            const angle = Math.random() * Math.PI * 2;
+            const speed = Math.random() * 2 + 1;
+            const vx = Math.cos(angle) * speed;
+            const vy = Math.sin(angle) * speed;
+
+            let opacity = 1;
+            const animate = () => {
+                const x = parseFloat(particle.style.left);
+                const y = parseFloat(particle.style.top);
+                particle.style.left = x + vx + 'px';
+                particle.style.top = y + vy + 'px';
+                opacity -= 0.02;
+                particle.style.opacity = opacity;
+
+                if (opacity > 0) {
+                    requestAnimationFrame(animate);
+                } else {
+                    maze.removeChild(particle);
+                }
+            };
+
+            requestAnimationFrame(animate);
+        }
         function gameLoop(currentTime) {
+            if (!game.isStarted) return;
+
             if (game.lastTime === 0) {
                 game.lastTime = currentTime;
             }
@@ -598,8 +720,13 @@ function movePlayer(deltaTime) {
             powerUpIndicator.textContent = 'Power-up: None';
         }
 
-        initGame();
-        requestAnimationFrame(gameLoop);
+        startButton.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            game.isStarted = true;
+            initGame();
+            requestAnimationFrame(gameLoop);
+        });
     </script>
 </body>
+
 </html>
