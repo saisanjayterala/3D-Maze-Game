@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maze Game - Version 1</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+        }
+        #maze {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .wall {
+            position: absolute;
+            background-color: #333;
+        }
+        #player {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #ff0000;
+            border-radius: 50%;
+        }
+        #goal {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #00ff00;
+            border-radius: 50%;
+        }
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #fff;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="maze"></div>
+        <div id="player"></div>
+        <div id="goal"></div>
+        <div id="hud">
+            <div id="timer">Time: 0s</div>
+            <div id="moves">Moves: 0</div>
+        </div>
+    </div>
+    <script>
+        const maze = document.getElementById('maze');
+        const player = document.getElementById('player');
+        const goal = document.getElementById('goal');
+        const timerDisplay = document.getElementById('timer');
+        const movesDisplay = document.getElementById('moves');
+
+        const mazeSize = 10;
+        const cellSize = 40;
+        let playerX = 0;
+        let playerY = 0;
+        let moves = 0;
+        let startTime;
+
+        const mazeLayout = [
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+            [1, 0, 1, 0, 1, 0, 1, 1, 0, 1],
+            [1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
+            [1, 0, 1, 1, 1, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 1, 0, 1, 0, 1],
+            [1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 1, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+        ];
+
+        function createMaze() {
+            for (let y = 0; y < mazeSize; y++) {
+                for (let x = 0; x < mazeSize; x++) {
+                    if (mazeLayout[y][x] === 1) {
+                        const wall = document.createElement('div');
+                        wall.className = 'wall';
+                        wall.style.width = cellSize + 'px';
+                        wall.style.height = cellSize + 'px';
+                        wall.style.left = x * cellSize + 'px';
+                        wall.style.top = y * cellSize + 'px';
+                        maze.appendChild(wall);
+                    }
+                }
+            }
+        }
+
+        function initGame() {
+            createMaze();
+            player.style.left = playerX * cellSize + 'px';
+            player.style.top = playerY * cellSize + 'px';
+            goal.style.left = (mazeSize - 2) * cellSize + 'px';
+            goal.style.top = (mazeSize - 2) * cellSize + 'px';
+            startTime = Date.now();
+            updateTimer();
+        }
+
+        function movePlayer(dx, dy) {
+            const newX = playerX + dx;
+            const newY = playerY + dy;
+
+            if (newX >= 0 && newX < mazeSize && newY >= 0 && newY < mazeSize && mazeLayout[newY][newX] === 0) {
+                playerX = newX;
+                playerY = newY;
+                player.style.left = playerX * cellSize + 'px';
+                player.style.top = playerY * cellSize + 'px';
+                moves++;
+                movesDisplay.textContent = `Moves: ${moves}`;
+                checkWin();
+            }
+        }
+
+        function checkWin() {
+            if (playerX === mazeSize - 2 && playerY === mazeSize - 2) {
+                alert('Congratulations! You won!');
+                resetGame();
+            }
+        }
+
+        function resetGame() {
+            playerX = 0;
+            playerY = 0;
+            moves = 0;
+            player.style.left = playerX * cellSize + 'px';
+            player.style.top = playerY * cellSize + 'px';
+            movesDisplay.textContent = `Moves: ${moves}`;
+            startTime = Date.now();
+        }
+
+        function updateTimer() {
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+            timerDisplay.textContent = `Time: ${elapsedTime}s`;
+            requestAnimationFrame(updateTimer);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
+                    movePlayer(0, -1);
+                    break;
+                case 'ArrowDown':
+                    movePlayer(0, 1);
+                    break;
+                case 'ArrowLeft':
+                    movePlayer(-1, 0);
+                    break;
+                case 'ArrowRight':
+                    movePlayer(1, 0);
+                    break;
+            }
+        });
+
+        initGame();
+    </script>
+</body>
+</html>
