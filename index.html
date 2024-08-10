@@ -3,49 +3,66 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Maze Game - Version 1</title>
+    <title>3D Maze Game - Version 2</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             font-family: Arial, sans-serif;
+            background-color: #222;
         }
         #gameContainer {
             position: relative;
             width: 100vw;
             height: 100vh;
-            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         #maze {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            position: relative;
+            background-color: #000;
+            border: 2px solid #444;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
         }
         .wall {
             position: absolute;
-            background-color: #333;
+            background-color: #555;
+            border: 1px solid #777;
         }
         #player {
             position: absolute;
-            width: 10px;
-            height: 10px;
-            background-color: #ff0000;
+            width: 20px;
+            height: 20px;
+            background-color: #ff6b6b;
             border-radius: 50%;
+            transition: all 0.1s ease;
+            z-index: 10;
         }
         #goal {
             position: absolute;
-            width: 20px;
-            height: 20px;
-            background-color: #00ff00;
+            width: 30px;
+            height: 30px;
+            background-color: #4ecdc4;
             border-radius: 50%;
+            z-index: 5;
         }
         #hud {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: 20px;
+            left: 20px;
             color: #fff;
             font-size: 18px;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #fff;
+            font-size: 16px;
         }
     </style>
 </head>
@@ -58,6 +75,9 @@
             <div id="timer">Time: 0s</div>
             <div id="moves">Moves: 0</div>
         </div>
+        <div id="controls">
+            Use arrow keys or WASD to move
+        </div>
     </div>
     <script>
         const maze = document.getElementById('maze');
@@ -66,27 +86,32 @@
         const timerDisplay = document.getElementById('timer');
         const movesDisplay = document.getElementById('moves');
 
-        const mazeSize = 10;
+        const mazeSize = 12;
         const cellSize = 40;
-        let playerX = 0;
-        let playerY = 0;
+        let playerX = 1;
+        let playerY = 1;
         let moves = 0;
         let startTime;
 
         const mazeLayout = [
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-            [1, 0, 1, 0, 1, 0, 1, 1, 0, 1],
-            [1, 0, 1, 0, 0, 0, 0, 1, 0, 1],
-            [1, 0, 1, 1, 1, 1, 0, 1, 0, 1],
-            [1, 0, 0, 0, 0, 1, 0, 1, 0, 1],
-            [1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
-            [1, 0, 0, 0, 0, 1, 0, 0, 0, 1],
-            [1, 0, 1, 1, 1, 1, 1, 1, 0, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
+            [1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1],
+            [1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+            [1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1],
+            [1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1],
+            [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1],
+            [1, 0, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1],
+            [1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1],
+            [1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
         ];
 
         function createMaze() {
+            maze.style.width = mazeSize * cellSize + 'px';
+            maze.style.height = mazeSize * cellSize + 'px';
+
             for (let y = 0; y < mazeSize; y++) {
                 for (let x = 0; x < mazeSize; x++) {
                     if (mazeLayout[y][x] === 1) {
@@ -104,12 +129,16 @@
 
         function initGame() {
             createMaze();
-            player.style.left = playerX * cellSize + 'px';
-            player.style.top = playerY * cellSize + 'px';
-            goal.style.left = (mazeSize - 2) * cellSize + 'px';
-            goal.style.top = (mazeSize - 2) * cellSize + 'px';
+            updatePlayerPosition();
+            goal.style.left = (mazeSize - 2) * cellSize + 5 + 'px';
+            goal.style.top = (mazeSize - 2) * cellSize + 5 + 'px';
             startTime = Date.now();
             updateTimer();
+        }
+
+        function updatePlayerPosition() {
+            player.style.left = playerX * cellSize + 10 + 'px';
+            player.style.top = playerY * cellSize + 10 + 'px';
         }
 
         function movePlayer(dx, dy) {
@@ -119,8 +148,7 @@
             if (newX >= 0 && newX < mazeSize && newY >= 0 && newY < mazeSize && mazeLayout[newY][newX] === 0) {
                 playerX = newX;
                 playerY = newY;
-                player.style.left = playerX * cellSize + 'px';
-                player.style.top = playerY * cellSize + 'px';
+                updatePlayerPosition();
                 moves++;
                 movesDisplay.textContent = `Moves: ${moves}`;
                 checkWin();
@@ -129,17 +157,17 @@
 
         function checkWin() {
             if (playerX === mazeSize - 2 && playerY === mazeSize - 2) {
-                alert('Congratulations! You won!');
+                const endTime = Math.floor((Date.now() - startTime) / 1000);
+                alert(`Congratulations! You won in ${endTime} seconds with ${moves} moves!`);
                 resetGame();
             }
         }
 
         function resetGame() {
-            playerX = 0;
-            playerY = 0;
+            playerX = 1;
+            playerY = 1;
             moves = 0;
-            player.style.left = playerX * cellSize + 'px';
-            player.style.top = playerY * cellSize + 'px';
+            updatePlayerPosition();
             movesDisplay.textContent = `Moves: ${moves}`;
             startTime = Date.now();
         }
@@ -153,15 +181,23 @@
         document.addEventListener('keydown', (e) => {
             switch (e.key) {
                 case 'ArrowUp':
+                case 'w':
+                case 'W':
                     movePlayer(0, -1);
                     break;
                 case 'ArrowDown':
+                case 's':
+                case 'S':
                     movePlayer(0, 1);
                     break;
                 case 'ArrowLeft':
+                case 'a':
+                case 'A':
                     movePlayer(-1, 0);
                     break;
                 case 'ArrowRight':
+                case 'd':
+                case 'D':
                     movePlayer(1, 0);
                     break;
             }
