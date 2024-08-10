@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Maze Game - Version 4</title>
+    <title>3D Maze Game - Version 5</title>
     <style>
         body {
             margin: 0;
@@ -48,7 +48,7 @@
             height: 20px;
             background-color: #ffd700;
             border-radius: 50%;
-            transition: all 0.2s ease;
+            transition: all 0.1s linear;
             z-index: 10;
             box-shadow: 0 0 15px #ffd700;
         }
@@ -123,6 +123,34 @@
             50% { transform: translateY(-10px); }
             100% { transform: translateY(0px); }
         }
+        #staminaBar {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        #staminaFill {
+            width: 100%;
+            height: 100%;
+            background-color: #4caf50;
+            transition: width 0.3s ease;
+        }
+        #inventory {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            color: #fff;
+            font-size: 16px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
@@ -137,15 +165,20 @@
         </div>
         <div id="controls">
             Use arrow keys or WASD to move<br>
+            Hold Shift to sprint<br>
             Q/E to rotate the maze<br>
             R to reset level
         </div>
         <div id="levelIndicator">Level: 1</div>
         <canvas id="minimap"></canvas>
+        <div id="staminaBar">
+            <div id="staminaFill"></div>
+        </div>
+        <div id="inventory">Inventory: []</div>
     </div>
     <script>
         const maze = document.getElementById('maze');
-        const player = document.getElementById('player');
+        const playerEl = document.getElementById('player');
         const goal = document.getElementById('goal');
         const timerDisplay = document.getElementById('timer');
         const movesDisplay = document.getElementById('moves');
@@ -153,17 +186,35 @@
         const collectiblesDisplay = document.getElementById('collectibles');
         const minimap = document.getElementById('minimap');
         const minimapCtx = minimap.getContext('2d');
+        const staminaFill = document.getElementById('staminaFill');
+        const inventoryDisplay = document.getElementById('inventory');
 
         const mazeSize = 15;
         const cellSize = 40;
-        let playerX = 1;
-        let playerY = 1;
         let moves = 0;
         let startTime;
         let currentLevel = 1;
         let rotationZ = 0;
         let collectibles = [];
         let collectedCount = 0;
+
+        const player = {
+            x: 1,
+            y: 1,
+            speed: 5,
+            sprintSpeed: 10,
+            stamina: 100,
+            maxStamina: 100,
+            staminaRegenRate: 0.5,
+            inventory: []
+        };
+
+        const game = {
+            isSprinting: false,
+            keys: {},
+            lastTime: 0,
+            deltaTime: 0
+        };
 
         const levels = [
             [
@@ -224,7 +275,7 @@
                 do {
                     x = Math.floor(Math.random() * mazeSize);
                     y = Math.floor(Math.random() * mazeSize);
-                } while (currentMaze[y][x] === 1 || (x === playerX && y === playerY) || (x === mazeSize - 2 && y === mazeSize - 2));
+                } while (currentMaze[y][x] === 1 || (x === player.x && y === player.y) || (x === mazeSize - 2 && y === mazeSize - 2));
 
                 const collectible = document.createElement('div');
                 collectible.className = 'collectible';
@@ -249,35 +300,70 @@
         }
 
         function updatePlayerPosition() {
-            player.style.left = playerX * cellSize + 10 + 'px';
-            player.style.top = playerY * cellSize + 10 + 'px';
+            playerEl.style.left = player.x * cellSize + 10 + 'px';
+            playerEl.style.top = player.y * cellSize + 10 + 'px';
             updateMinimap();
         }
 
-        function movePlayer(dx, dy) {
-            const newX = playerX + dx;
-            const newY = playerY + dy;
+        function movePlayer(deltaTime) {
+            const currentSpeed = game.isSprinting ? player.sprintSpeed : player.speed;
+            const movement = {x: 0, y: 0};
+
+            if (game.keys['ArrowUp'] || game.keys['w']) movement.y -= 1;
+            if (game.keys['ArrowDown'] || game.keys['s']) movement.y += 1;
+            if (game.keys['ArrowLeft'] || game.keys['a']) movement.x -= 1;
+            if (game.keys['ArrowRight'] || game.keys['d']) movement.x += 1;
+
+            // Normalize diagonal movement
+            if (movement.x !== 0 && movement.y !== 0) {
+                movement.x *= Math.SQRT1_2;
+                movement.y *= Math.SQRT1_2;
+            }
+
+            const newX = player.x + movement.x * currentSpeed * deltaTime;
+            const newY = player.y + movement.y * currentSpeed * deltaTime;
 
             const currentMaze = levels[currentLevel - 1];
 
-            if (newX >= 0 && newX < mazeSize && newY >= 0 && newY < mazeSize && currentMaze[newY][newX] === 0) {
-                playerX = newX;
-                playerY = newY;
+            if (canMove(newX, newY, currentMaze)) {
+                player.x = newX;
+                player.y = newY;
                 updatePlayerPosition();
                 moves++;
                 movesDisplay.textContent = `Moves: ${moves}`;
                 checkCollectibles();
                 checkWin();
             }
+
+            // Update stamina
+            if (game.isSprinting && (movement.x !== 0 || movement.y !== 0)) {
+                player.stamina = Math.max(0, player.stamina - 30 * deltaTime);
+            } else {
+                player.stamina = Math.min(player.maxStamina, player.stamina + player.staminaRegenRate * deltaTime);
+            }
+
+            updateStaminaBar();
+        }
+
+        function canMove(x, y, maze) {
+            const cellX = Math.floor(x);
+            const cellY = Math.floor(y);
+
+            // Check if the new position is within the maze bounds and not a wall
+            return cellX >= 0 && cellX < mazeSize && cellY >= 0 && cellY < mazeSize && maze[cellY][cellX] === 0;
         }
 
         function checkCollectibles() {
+            const playerCellX = Math.floor(player.x);
+            const playerCellY = Math.floor(player.y);
+
             collectibles.forEach((collectible, index) => {
-                if (collectible.x === playerX && collectible.y === playerY) {
+                if (collectible.x === playerCellX && collectible.y === playerCellY) {
                     maze.removeChild(collectible.element);
                     collectibles.splice(index, 1);
                     collectedCount++;
                     updateCollectiblesDisplay();
+                    addToInventory('Coin');
                 }
             });
         }
@@ -286,8 +372,17 @@
             collectiblesDisplay.textContent = `Collectibles: ${collectedCount}/5`;
         }
 
+        function addToInventory(item) {
+            player.inventory.push(item);
+            updateInventoryDisplay();
+        }
+
+        function updateInventoryDisplay() {
+            inventoryDisplay.textContent = `Inventory: [${player.inventory.join(', ')}]`;
+        }
+
         function checkWin() {
-            if (playerX === mazeSize - 2 && playerY === mazeSize - 2 && collectedCount === 5) {
+            if (Math.floor(player.x) === mazeSize - 2 && Math.floor(player.y) === mazeSize - 2 && collectedCount === 5) {
                 const endTime = Math.floor((Date.now() - startTime) / 1000);
                 alert(`Level ${currentLevel} completed in ${endTime} seconds with ${moves} moves!`);
                 if (currentLevel < levels.length) {
@@ -302,14 +397,18 @@
         }
 
         function resetGame() {
-            playerX = 1;
-            playerY = 1;
+            player.x = 1;
+            player.y = 1;
             moves = 0;
             rotationZ = 0;
+            player.stamina = player.maxStamina;
+            player.inventory = [];
             maze.style.transform = `rotateX(60deg) rotateZ(${rotationZ}deg)`;
             updatePlayerPosition();
             movesDisplay.textContent = `Moves: ${moves}`;
             startTime = Date.now();
+            updateStaminaBar();
+            updateInventoryDisplay();
             initGame();
         }
 
@@ -346,7 +445,7 @@
             }
 
             minimapCtx.fillStyle = '#ffd700';
-            minimapCtx.fillRect(playerX * 10, playerY * 10, 10, 10);
+            minimapCtx.fillRect(player.x * 10, player.y * 10, 10, 10);
 
             minimapCtx.fillStyle = '#4ecdc4';
             minimapCtx.fillRect((mazeSize - 2) * 10, (mazeSize - 2) * 10, 10, 10);
@@ -357,44 +456,50 @@
             });
         }
 
-document.addEventListener('keydown', (e) => {
-    switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
-        case 'W':
-            movePlayer(0, -1);
-            break;
-        case 'ArrowDown':
-        case 's':
-        case 'S':
-            movePlayer(0, 1);
-            break;
-        case 'ArrowLeft':
-        case 'a':
-        case 'A':
-            movePlayer(-1, 0);
-            break;
-        case 'ArrowRight':
-        case 'd':
-        case 'D':
-            movePlayer(1, 0);
-            break;
-        case 'q':
-        case 'Q':
-            rotateMaze(-1);
-            break;
-        case 'e':
-        case 'E':
-            rotateMaze(1);
-            break;
-        case 'r':
-        case 'R':
-            resetGame();
-            break;
-    }
-});
+        function updateStaminaBar() {
+            const staminaPercentage = (player.stamina / player.maxStamina) * 100;
+            staminaFill.style.width = `${staminaPercentage}%`;
+            staminaFill.style.backgroundColor = staminaPercentage > 30 ? '#4caf50' : '#f44336';
+        }
 
-initGame();
-</script>
+        function gameLoop(currentTime) {
+            if (game.lastTime === 0) {
+                game.lastTime = currentTime;
+            }
+
+            game.deltaTime = (currentTime - game.lastTime) / 1000;
+            game.lastTime = currentTime;
+
+            movePlayer(game.deltaTime);
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            game.keys[e.key] = true;
+            if (e.key === 'Shift') {
+                game.isSprinting = true;
+            }
+            if (e.key === 'q' || e.key === 'Q') {
+                rotateMaze(-1);
+            }
+            if (e.key === 'e' || e.key === 'E') {
+                rotateMaze(1);
+            }
+            if (e.key === 'r' || e.key === 'R') {
+                resetGame();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            game.keys[e.key] = false;
+            if (e.key === 'Shift') {
+                game.isSprinting = false;
+            }
+        });
+
+        initGame();
+        requestAnimationFrame(gameLoop);
+    </script>
 </body>
 </html>
