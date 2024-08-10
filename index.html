@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Maze Game - Version 5</title>
+    <title>3D Maze Game - Version 6.1</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #0a0a1a;
+            color: #ffffff;
         }
         #gameContainer {
             position: relative;
@@ -151,6 +152,31 @@
             border-radius: 5px;
             z-index: 100;
         }
+        #powerUpIndicator {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            color: #fff;
+            font-size: 16px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 100;
+        }
+        .powerUp {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #ff00ff;
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 0 15px #ff00ff;
+            animation: rotate 3s infinite linear;
+        }
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -167,7 +193,8 @@
             Use arrow keys or WASD to move<br>
             Hold Shift to sprint<br>
             Q/E to rotate the maze<br>
-            R to reset level
+            R to reset level<br>
+            Space to use power-up
         </div>
         <div id="levelIndicator">Level: 1</div>
         <canvas id="minimap"></canvas>
@@ -175,6 +202,7 @@
             <div id="staminaFill"></div>
         </div>
         <div id="inventory">Inventory: []</div>
+        <div id="powerUpIndicator">Power-up: None</div>
     </div>
     <script>
         const maze = document.getElementById('maze');
@@ -188,6 +216,7 @@
         const minimapCtx = minimap.getContext('2d');
         const staminaFill = document.getElementById('staminaFill');
         const inventoryDisplay = document.getElementById('inventory');
+        const powerUpIndicator = document.getElementById('powerUpIndicator');
 
         const mazeSize = 15;
         const cellSize = 40;
@@ -197,6 +226,8 @@
         let rotationZ = 0;
         let collectibles = [];
         let collectedCount = 0;
+        let powerUps = [];
+        let activePowerUp = null;
 
         const player = {
             x: 1,
@@ -263,6 +294,7 @@
                 }
             }
             createCollectibles();
+            createPowerUps();
         }
 
         function createCollectibles() {
@@ -288,6 +320,27 @@
             updateCollectiblesDisplay();
         }
 
+        function createPowerUps() {
+            powerUps = [];
+            const currentMaze = levels[currentLevel - 1];
+
+            for (let i = 0; i < 2; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * mazeSize);
+                    y = Math.floor(Math.random() * mazeSize);
+                } while (currentMaze[y][x] === 1 || (x === player.x && y === player.y) || (x === mazeSize - 2 && y === mazeSize - 2) || collectibles.some(c => c.x === x && c.y === y));
+
+                const powerUp = document.createElement('div');
+                powerUp.className = 'powerUp';
+                powerUp.style.left = x * cellSize + 10 + 'px';
+                powerUp.style.top = y * cellSize + 10 + 'px';
+                maze.appendChild(powerUp);
+
+                powerUps.push({ x, y, element: powerUp, type: ['speed', 'teleport'][Math.floor(Math.random() * 2)] });
+            }
+        }
+
         function initGame() {
             createMaze();
             updatePlayerPosition();
@@ -304,8 +357,7 @@
             playerEl.style.top = player.y * cellSize + 10 + 'px';
             updateMinimap();
         }
-
-        function movePlayer(deltaTime) {
+function movePlayer(deltaTime) {
             const currentSpeed = game.isSprinting ? player.sprintSpeed : player.speed;
             const movement = {x: 0, y: 0};
 
@@ -320,8 +372,8 @@
                 movement.y *= Math.SQRT1_2;
             }
 
-            const newX = player.x + movement.x * currentSpeed * deltaTime;
-            const newY = player.y + movement.y * currentSpeed * deltaTime;
+            const newX = player.x + movement.x * currentSpeed * deltaTime * (activePowerUp === 'speed' ? 2 : 1);
+            const newY = player.y + movement.y * currentSpeed * deltaTime * (activePowerUp === 'speed' ? 2 : 1);
 
             const currentMaze = levels[currentLevel - 1];
 
@@ -332,6 +384,7 @@
                 moves++;
                 movesDisplay.textContent = `Moves: ${moves}`;
                 checkCollectibles();
+                checkPowerUps();
                 checkWin();
             }
 
@@ -366,6 +419,28 @@
                     addToInventory('Coin');
                 }
             });
+        }
+
+        function checkPowerUps() {
+            const playerCellX = Math.floor(player.x);
+            const playerCellY = Math.floor(player.y);
+
+            powerUps.forEach((powerUp, index) => {
+                if (powerUp.x === playerCellX && powerUp.y === playerCellY) {
+                    maze.removeChild(powerUp.element);
+                    powerUps.splice(index, 1);
+                    activatePowerUp(powerUp.type);
+                }
+            });
+        }
+
+        function activatePowerUp(type) {
+            activePowerUp = type;
+            powerUpIndicator.textContent = `Power-up: ${type.charAt(0).toUpperCase() + type.slice(1)}`;
+            setTimeout(() => {
+                activePowerUp = null;
+                powerUpIndicator.textContent = 'Power-up: None';
+            }, 10000);
         }
 
         function updateCollectiblesDisplay() {
@@ -403,12 +478,14 @@
             rotationZ = 0;
             player.stamina = player.maxStamina;
             player.inventory = [];
+            activePowerUp = null;
             maze.style.transform = `rotateX(60deg) rotateZ(${rotationZ}deg)`;
             updatePlayerPosition();
             movesDisplay.textContent = `Moves: ${moves}`;
             startTime = Date.now();
             updateStaminaBar();
             updateInventoryDisplay();
+            powerUpIndicator.textContent = 'Power-up: None';
             initGame();
         }
 
@@ -454,6 +531,11 @@
                 minimapCtx.fillStyle = '#ff9f1c';
                 minimapCtx.fillRect(collectible.x * 10, collectible.y * 10, 10, 10);
             });
+
+            powerUps.forEach(powerUp => {
+                minimapCtx.fillStyle = '#ff00ff';
+                minimapCtx.fillRect(powerUp.x * 10, powerUp.y * 10, 10, 10);
+            });
         }
 
         function updateStaminaBar() {
@@ -489,6 +571,9 @@
             if (e.key === 'r' || e.key === 'R') {
                 resetGame();
             }
+            if (e.key === ' ' && activePowerUp === 'teleport') {
+                teleportPlayer();
+            }
         });
 
         document.addEventListener('keyup', (e) => {
@@ -497,6 +582,21 @@
                 game.isSprinting = false;
             }
         });
+
+        function teleportPlayer() {
+            const currentMaze = levels[currentLevel - 1];
+            let newX, newY;
+            do {
+                newX = Math.floor(Math.random() * mazeSize);
+                newY = Math.floor(Math.random() * mazeSize);
+            } while (currentMaze[newY][newX] === 1);
+
+            player.x = newX;
+            player.y = newY;
+            updatePlayerPosition();
+            activePowerUp = null;
+            powerUpIndicator.textContent = 'Power-up: None';
+        }
 
         initGame();
         requestAnimationFrame(gameLoop);
