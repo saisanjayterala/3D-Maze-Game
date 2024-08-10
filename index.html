@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Maze Game - Version 3</title>
+    <title>3D Maze Game - Version 4</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             font-family: Arial, sans-serif;
-            background-color: #1a1a2e;
+            background-color: #0a0a1a;
         }
         #gameContainer {
             position: relative;
@@ -18,13 +18,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            perspective: 1000px;
+            perspective: 1200px;
         }
         #maze {
             position: relative;
             background-color: #16213e;
             border: 2px solid #0f3460;
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+            box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
             transform: rotateX(60deg) rotateZ(0deg);
             transform-style: preserve-3d;
             transition: transform 0.5s ease;
@@ -34,11 +34,13 @@
             background-color: #e94560;
             border: 1px solid #ff5f7e;
             transform-style: preserve-3d;
+            transition: all 0.3s ease;
         }
         .floor {
             position: absolute;
             background-color: #0f3460;
             border: 1px solid #16213e;
+            transition: all 0.3s ease;
         }
         #player {
             position: absolute;
@@ -48,7 +50,7 @@
             border-radius: 50%;
             transition: all 0.2s ease;
             z-index: 10;
-            box-shadow: 0 0 10px #ffd700;
+            box-shadow: 0 0 15px #ffd700;
         }
         #goal {
             position: absolute;
@@ -57,7 +59,13 @@
             background-color: #4ecdc4;
             border-radius: 50%;
             z-index: 5;
-            box-shadow: 0 0 15px #4ecdc4;
+            box-shadow: 0 0 20px #4ecdc4;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
         }
         #hud {
             position: absolute;
@@ -65,9 +73,10 @@
             left: 20px;
             color: #fff;
             font-size: 18px;
-            background-color: rgba(0, 0, 0, 0.6);
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 15px;
             border-radius: 10px;
+            z-index: 100;
         }
         #controls {
             position: absolute;
@@ -75,9 +84,10 @@
             left: 20px;
             color: #fff;
             font-size: 16px;
-            background-color: rgba(0, 0, 0, 0.6);
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 10px;
             border-radius: 5px;
+            z-index: 100;
         }
         #levelIndicator {
             position: absolute;
@@ -85,9 +95,33 @@
             right: 20px;
             color: #fff;
             font-size: 24px;
-            background-color: rgba(0, 0, 0, 0.6);
+            background-color: rgba(0, 0, 0, 0.7);
             padding: 10px;
             border-radius: 5px;
+            z-index: 100;
+        }
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 2px solid #fff;
+            z-index: 100;
+        }
+        .collectible {
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background-color: #ff9f1c;
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 0 10px #ff9f1c;
+            animation: float 3s infinite ease-in-out;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
         }
     </style>
 </head>
@@ -99,12 +133,15 @@
         <div id="hud">
             <div id="timer">Time: 0s</div>
             <div id="moves">Moves: 0</div>
+            <div id="collectibles">Collectibles: 0/5</div>
         </div>
         <div id="controls">
             Use arrow keys or WASD to move<br>
-            Q/E to rotate the maze
+            Q/E to rotate the maze<br>
+            R to reset level
         </div>
         <div id="levelIndicator">Level: 1</div>
+        <canvas id="minimap"></canvas>
     </div>
     <script>
         const maze = document.getElementById('maze');
@@ -113,6 +150,9 @@
         const timerDisplay = document.getElementById('timer');
         const movesDisplay = document.getElementById('moves');
         const levelIndicator = document.getElementById('levelIndicator');
+        const collectiblesDisplay = document.getElementById('collectibles');
+        const minimap = document.getElementById('minimap');
+        const minimapCtx = minimap.getContext('2d');
 
         const mazeSize = 15;
         const cellSize = 40;
@@ -122,6 +162,8 @@
         let startTime;
         let currentLevel = 1;
         let rotationZ = 0;
+        let collectibles = [];
+        let collectedCount = 0;
 
         const levels = [
             [
@@ -169,6 +211,30 @@
                     maze.appendChild(cell);
                 }
             }
+            createCollectibles();
+        }
+
+        function createCollectibles() {
+            collectibles = [];
+            collectedCount = 0;
+            const currentMaze = levels[currentLevel - 1];
+
+            for (let i = 0; i < 5; i++) {
+                let x, y;
+                do {
+                    x = Math.floor(Math.random() * mazeSize);
+                    y = Math.floor(Math.random() * mazeSize);
+                } while (currentMaze[y][x] === 1 || (x === playerX && y === playerY) || (x === mazeSize - 2 && y === mazeSize - 2));
+
+                const collectible = document.createElement('div');
+                collectible.className = 'collectible';
+                collectible.style.left = x * cellSize + 12.5 + 'px';
+                collectible.style.top = y * cellSize + 12.5 + 'px';
+                maze.appendChild(collectible);
+
+                collectibles.push({ x, y, element: collectible });
+            }
+            updateCollectiblesDisplay();
         }
 
         function initGame() {
@@ -179,11 +245,13 @@
             startTime = Date.now();
             updateTimer();
             levelIndicator.textContent = `Level: ${currentLevel}`;
+            setupMinimap();
         }
 
         function updatePlayerPosition() {
             player.style.left = playerX * cellSize + 10 + 'px';
             player.style.top = playerY * cellSize + 10 + 'px';
+            updateMinimap();
         }
 
         function movePlayer(dx, dy) {
@@ -198,12 +266,28 @@
                 updatePlayerPosition();
                 moves++;
                 movesDisplay.textContent = `Moves: ${moves}`;
+                checkCollectibles();
                 checkWin();
             }
         }
 
+        function checkCollectibles() {
+            collectibles.forEach((collectible, index) => {
+                if (collectible.x === playerX && collectible.y === playerY) {
+                    maze.removeChild(collectible.element);
+                    collectibles.splice(index, 1);
+                    collectedCount++;
+                    updateCollectiblesDisplay();
+                }
+            });
+        }
+
+        function updateCollectiblesDisplay() {
+            collectiblesDisplay.textContent = `Collectibles: ${collectedCount}/5`;
+        }
+
         function checkWin() {
-            if (playerX === mazeSize - 2 && playerY === mazeSize - 2) {
+            if (playerX === mazeSize - 2 && playerY === mazeSize - 2 && collectedCount === 5) {
                 const endTime = Math.floor((Date.now() - startTime) / 1000);
                 alert(`Level ${currentLevel} completed in ${endTime} seconds with ${moves} moves!`);
                 if (currentLevel < levels.length) {
@@ -240,40 +324,77 @@
             maze.style.transform = `rotateX(60deg) rotateZ(${rotationZ}deg)`;
         }
 
-        document.addEventListener('keydown', (e) => {
-            switch (e.key) {
-                case 'ArrowUp':
-                case 'w':
-                case 'W':
-                    movePlayer(0, -1);
-                    break;
-                case 'ArrowDown':
-                case 's':
-                case 'S':
-                    movePlayer(0, 1);
-                    break;
-                case 'ArrowLeft':
-                case 'a':
-                case 'A':
-                    movePlayer(-1, 0);
-                    break;
-                case 'ArrowRight':
-                case 'd':
-                case 'D':
-                    movePlayer(1, 0);
-                    break;
-                case 'q':
-                case 'Q':
-                    rotateMaze(-1);
-                    break;
-                case 'e':
-                case 'E':
-                    rotateMaze(1);
-                    break;
-            }
-        });
+        function setupMinimap() {
+            minimap.width = mazeSize * 10;
+            minimap.height = mazeSize * 10;
+            updateMinimap();
+        }
 
-        initGame();
-    </script>
+        function updateMinimap() {
+            minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
+            const currentMaze = levels[currentLevel - 1];
+
+            for (let y = 0; y < mazeSize; y++) {
+                for (let x = 0; x < mazeSize; x++) {
+                    if (currentMaze[y][x] === 1) {
+                        minimapCtx.fillStyle = '#e94560';
+                    } else {
+                        minimapCtx.fillStyle = '#0f3460';
+                    }
+                    minimapCtx.fillRect(x * 10, y * 10, 10, 10);
+                }
+            }
+
+            minimapCtx.fillStyle = '#ffd700';
+            minimapCtx.fillRect(playerX * 10, playerY * 10, 10, 10);
+
+            minimapCtx.fillStyle = '#4ecdc4';
+            minimapCtx.fillRect((mazeSize - 2) * 10, (mazeSize - 2) * 10, 10, 10);
+
+            collectibles.forEach(collectible => {
+                minimapCtx.fillStyle = '#ff9f1c';
+                minimapCtx.fillRect(collectible.x * 10, collectible.y * 10, 10, 10);
+            });
+        }
+
+document.addEventListener('keydown', (e) => {
+    switch (e.key) {
+        case 'ArrowUp':
+        case 'w':
+        case 'W':
+            movePlayer(0, -1);
+            break;
+        case 'ArrowDown':
+        case 's':
+        case 'S':
+            movePlayer(0, 1);
+            break;
+        case 'ArrowLeft':
+        case 'a':
+        case 'A':
+            movePlayer(-1, 0);
+            break;
+        case 'ArrowRight':
+        case 'd':
+        case 'D':
+            movePlayer(1, 0);
+            break;
+        case 'q':
+        case 'Q':
+            rotateMaze(-1);
+            break;
+        case 'e':
+        case 'E':
+            rotateMaze(1);
+            break;
+        case 'r':
+        case 'R':
+            resetGame();
+            break;
+    }
+});
+
+initGame();
+</script>
 </body>
 </html>
